@@ -20,7 +20,7 @@
   <exec_depend>nav2_dynamic_msgs</exec_depend>
   <exec_depend>visualization_msgs</exec_depend>
   <exec_depend>rclpy</exec_depend>
-  <exec_depend>cv2</exec_depend>
+  <exec_depend>opencv-python</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>tf2_geometry_msgs</exec_depend>
