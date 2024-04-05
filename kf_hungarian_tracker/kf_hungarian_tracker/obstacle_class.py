@@ -90,12 +90,12 @@ class ObstacleClass:
             detect_msg.position.z = 0.
         measurement = np.array([[detect_msg.position.x, detect_msg.position.y, detect_msg.position.z]]).T.astype(np.float32)
         self.kalman.correct(measurement)
-        self.msg.position.x = np.float(self.kalman.statePost[0][0])
-        self.msg.position.y = np.float(self.kalman.statePost[1][0])
-        self.msg.position.z = np.float(self.kalman.statePost[2][0])
-        self.msg.velocity.x = np.float(self.kalman.statePost[3][0])
-        self.msg.velocity.y = np.float(self.kalman.statePost[4][0])
-        self.msg.velocity.z = np.float(self.kalman.statePost[5][0])
+        self.msg.position.x = float(self.kalman.statePost[0][0])
+        self.msg.position.y = float(self.kalman.statePost[1][0])
+        self.msg.position.z = float(self.kalman.statePost[2][0])
+        self.msg.velocity.x = float(self.kalman.statePost[3][0])
+        self.msg.velocity.y = float(self.kalman.statePost[4][0])
+        self.msg.velocity.z = float(self.kalman.statePost[5][0])
         self.msg.size = detect_msg.size
 
     def distance(self, other_msg):
