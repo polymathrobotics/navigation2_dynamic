@@ -215,7 +215,7 @@ class KFHungarianTracker(Node):
             self.tracker_obstacle_pub.publish(obstacle_array)
 
         # rviz visualization
-        if self.tracker_marker_pub.get_subscription_count() > 0:
+        if True:
             marker_array = MarkerArray()
             marker_list = []
             # add current active obstacles
@@ -260,6 +260,7 @@ class KFHungarianTracker(Node):
                 arrow.scale.y = 0.05
                 arrow.scale.z = 0.05
                 marker_list.append(arrow)
+
             # add dead obstacles to delete in rviz
             for dead_uuid in dead_object_list:
                 marker = Marker()
