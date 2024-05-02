@@ -204,6 +204,8 @@ class KFHungarianTracker(Node):
                 obstacle.velocity = do_transform_vector3(v, trans).vector
 
                 obstacle.size = obs.msg.size
+                obstacle.position_covariance = obs.msg.position_covariance
+                obstacle.velocity_covariance = obs.msg.velocity_covariance
 
                 # do not publish obstacles with low speed
                 track_list.append(obstacle)
