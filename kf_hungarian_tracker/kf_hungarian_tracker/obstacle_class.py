@@ -97,6 +97,8 @@ class ObstacleClass:
         self.msg.velocity.y = float(self.kalman.statePost[4][0])
         self.msg.velocity.z = float(self.kalman.statePost[5][0])
         self.msg.size = detect_msg.size
+        self.msg.position_covariance = detect_msg.position_covariance
+        self.msg.velocity_covariance = detect_msg.velocity_covariance
 
     def distance(self, other_msg):
         '''measurement distance between two obstacles, dy default it's Euler distance between centers
