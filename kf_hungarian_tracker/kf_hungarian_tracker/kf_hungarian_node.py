@@ -49,6 +49,7 @@ class KFHungarianTracker(Node):
                 ("vel_filter", [0.1, 2.0]),
                 ("height_filter", [-2.0, 2.0]),
                 ("cost_filter", 1.0),
+                ("transform_to_global_frame", False),
             ],
         )
         self.global_frame = self.get_parameter("global_frame")._value
@@ -60,6 +61,9 @@ class KFHungarianTracker(Node):
         self.height_filter = self.get_parameter("height_filter")._value
         self.top_down = self.get_parameter("top_down")._value
         self.cost_filter = self.get_parameter("cost_filter")._value
+        self.transform_to_global_frame = self.get_parameter(
+            "transform_to_global_frame"
+        )._value
 
         self.obstacle_list = []
         self.sec = 0
@@ -99,8 +103,43 @@ class KFHungarianTracker(Node):
         for obj in self.obstacle_list:
             obj.predict(dt)
 
-        sensor_time_stamp = msg.header.stamp
-        sensor_frame_id = msg.header.frame_id
+        if self.transform_to_global_frame:
+            # transform to global frame
+            if self.global_frame is not None:
+                try:
+                    trans = self.tf_buffer.lookup_transform(
+                        self.global_frame, msg.header.frame_id, rclpy.time.Time()
+                    )
+                    msg.header.frame_id = self.global_frame
+                    # do_transform_vector3(vector, trans) resets trans.transform.translation
+                    # values to 0.0, so we need to preserve them for future usage in the loop below
+                    translation_backup_x = trans.transform.translation.x
+                    translation_backup_y = trans.transform.translation.y
+                    translation_backup_z = trans.transform.translation.z
+                    for i in range(len(detections)):
+                        trans.transform.translation.x = translation_backup_x
+                        trans.transform.translation.y = translation_backup_y
+                        trans.transform.translation.z = translation_backup_z
+                        # transform position (point)
+                        p = PointStamped()
+                        p.point = detections[i].position
+                        detections[i].position = do_transform_point(p, trans).point
+                        # transform velocity (vector3)
+                        v = Vector3Stamped()
+                        v.vector = detections[i].velocity
+                        detections[i].velocity = do_transform_vector3(v, trans).vector
+                        # transform size (vector3)
+                        s = Vector3Stamped()
+                        s.vector = detections[i].size
+                        detections[i].size = do_transform_vector3(s, trans).vector
+
+                except TransformException as ex:
+                    self.get_logger().error(
+                        "fail to get tf from {} to {}: {}".format(
+                            msg.header.frame_id, self.global_frame, ex
+                        )
+                    )
+                    return
 
         # hungarian matching
         cost = np.zeros((num_of_obstacle, num_of_detect))
@@ -142,46 +181,24 @@ class KFHungarianTracker(Node):
             ):
                 filtered_obstacle_list.append(obs)
 
-        filtered_obstacle_list_sensor_frame = []
-
         # construct ObstacleArray
-        if True:  # self.tracker_obstacle_pub.get_subscription_count() > 0:
+        if self.tracker_obstacle_pub.get_subscription_count() > 0:
             obstacle_array = ObstacleArray()
-            obstacle_array.header.stamp = sensor_time_stamp
-            obstacle_array.header.frame_id = sensor_frame_id
-
+            obstacle_array.header = msg.header
             track_list = []
 
             for obs in filtered_obstacle_list:
-
-                obstacle = Obstacle()
-                obstacle.uuid = obs.msg.uuid
-                obstacle.position = obs.msg.position
-                obstacle.velocity = obs.msg.velocity
-                obstacle.size = obs.msg.size
-                obstacle.position_covariance = obs.msg.position_covariance
-                obstacle.velocity_covariance = obs.msg.velocity_covariance
-                track_list.append(obstacle)
-
-                obstacle_class = ObstacleClass(
-                    obstacle,
-                    self.top_down,
-                    self.measurement_noise_cov,
-                    self.error_cov_post,
-                    self.process_noise_cov,
-                )
-                obstacle_class.msg.uuid = obs.msg.uuid
-                filtered_obstacle_list_sensor_frame.append(obstacle_class)
+                track_list.append(obs.msg)
 
             obstacle_array.obstacles = track_list
             self.tracker_obstacle_pub.publish(obstacle_array)
 
         # rviz visualization
-        if True:
+        if self.tracker_marker_pub.get_subscription_count() > 0:
             marker_array = MarkerArray()
             marker_list = []
             # add current active obstacles
-            for obs in filtered_obstacle_list_sensor_frame:
+            for obs in filtered_obstacle_list:
                 obstacle_uuid = uuid.UUID(bytes=bytes(obs.msg.uuid.uuid))
                 (r, g, b) = colorsys.hsv_to_rgb(
                     obstacle_uuid.int % 360 / 360.0, 1.0, 1.0
@@ -189,8 +206,7 @@ class KFHungarianTracker(Node):
 
                 # make a cube
                 marker = Marker()
-                marker.header.stamp = sensor_time_stamp
-                marker.header.frame_id = sensor_frame_id
+                marker.header = msg.header
                 marker.ns = str(obstacle_uuid)
                 marker.id = 0
                 marker.type = 1  # CUBE
@@ -207,8 +223,7 @@ class KFHungarianTracker(Node):
                 marker_list.append(marker)
                 # make an arrow
                 arrow = Marker()
-                arrow.header.stamp = sensor_time_stamp
-                arrow.header.frame_id = sensor_frame_id
+                arrow.header = msg.header
                 arrow.ns = str(obstacle_uuid)
                 arrow.id = 1
                 arrow.type = 0
@@ -230,14 +245,12 @@ class KFHungarianTracker(Node):
             # add dead obstacles to delete in rviz
             for dead_uuid in dead_object_list:
                 marker = Marker()
-                marker.header.stamp = sensor_time_stamp
-                marker.header.frame_id = sensor_frame_id
+                marker.header = msg.header
                 marker.ns = str(dead_uuid)
                 marker.id = 0
                 marker.action = 2  # delete
                 arrow = Marker()
-                arrow.header.stamp = sensor_time_stamp
-                arrow.header.frame_id = sensor_frame_id
+                arrow.header = msg.header
                 arrow.ns = str(dead_uuid)
                 arrow.id = 1
                 arrow.action = 2
